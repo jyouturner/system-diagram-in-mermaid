@@ -1,0 +1,96 @@
+{
+  "skill_name": "system-diagram-in-mermaid",
+  "version": "0.2.0",
+  "notes": "Test prompts exercising different diagram archetypes. Each prompt has expectations for what the resulting diagram should and should not contain. These have not been run through a formal benchmark; they are seed cases for users running the skill-creator evaluation loop.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "request-trace-multi-tenant-rag",
+      "archetype": "request trace with trust boundaries",
+      "prompt": "Draw a system diagram for a request flowing through a multi-tenant retrieval-augmented generation service. The platform has an API gateway that does PII redaction, a shared orchestrator with plan/execute/verify/adjust stages, an LLM router with cost tiers, retriever adapters that hit a tenant-scoped vector store, an eval harness, a feedback pipeline that updates a skill registry, and a per-tenant hash-chained audit log.",
+      "expected_to_include": [
+        "A plan section in plain text before the Mermaid source",
+        "Three subgraphs encoding trust boundary (tenant-scoped, shared platform, per-tenant storage)",
+        "A single trace from the API client back to the API client",
+        "Audit log as a single sink with multiple dotted incoming arrows",
+        "PII redaction as an edge label, not a separate box",
+        "Plan-execute-verify-adjust loop drawn as a real loop (verify can return to plan via adjust)"
+      ],
+      "expected_to_exclude": [
+        "Failure recovery / circuit breakers as peer flow",
+        "Observability infrastructure as separate boxes",
+        "More than one cadence (no batch jobs alongside the request trace)",
+        "Decorative color (every color must map to the named semantic axis)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "ci-cd-pipeline",
+      "archetype": "request trace, no trust boundaries",
+      "prompt": "Draw a diagram of how a pull request flows through a typical CI/CD pipeline: developer pushes to a feature branch, GitHub Actions runs lint and unit tests, on green the PR can be reviewed, after approval it merges to main, which triggers a build/push to a container registry, then ArgoCD detects the new image and deploys to staging, then a manual gate promotes to prod.",
+      "expected_to_include": [
+        "Plan section naming the trace from developer push to prod deploy",
+        "Linear flow with a clear branch for the manual gate to prod",
+        "Stages as nodes, transitions as labeled edges",
+        "Some semantic distinction between automated stages and human-gated stages"
+      ],
+      "expected_to_exclude": [
+        "Trust-boundary subgraphs (not the right axis here)",
+        "Failure paths (test failures, deploy rollbacks) as peer flows",
+        "Monitoring/alerting infrastructure",
+        "Inventory of every CI step or deploy-tool config detail"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "iteration-mode-redraw",
+      "archetype": "diagnostic mode on existing messy diagram",
+      "prompt": "Here's a diagram of our checkout flow [user attaches a screenshot or describes a layered diagram with 12+ boxes, decorative color, audit logging drawn as a peer service, and missing return arrows]. It's hard to follow — can you redraw it?",
+      "expected_to_include": [
+        "Diagnosis BEFORE redrawing: 3-4 named failure modes from the diagnostic checklist",
+        "Explicit statement of which structural problem is most load-bearing",
+        "Plan section naming the trace before producing Mermaid",
+        "Redrawn diagram following the standard procedure"
+      ],
+      "expected_to_exclude": [
+        "Going straight to redraw without diagnosis",
+        "Listing every flaw rather than the 3-4 highest-leverage ones",
+        "Reproducing the original's failure modes in the redraw"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "out-of-scope-erd",
+      "archetype": "skill should NOT trigger / should redirect",
+      "prompt": "Draw me an ER diagram of user, post, and comment tables in a typical blog schema.",
+      "expected_to_include": [
+        "Recognition that this is an ERD, not a system architecture diagram",
+        "Direct use of Mermaid erDiagram syntax (or recommendation thereof)",
+        "Either no invocation of the skill, or the skill recognizing the case and stepping aside"
+      ],
+      "expected_to_exclude": [
+        "Forcing tables into a flowchart with subgraphs",
+        "Encoding columns as edges or trust boundaries",
+        "Going through the trace-planning procedure for what is not a trace"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "ml-training-pipeline",
+      "archetype": "cross-cadence loop, not a request trace",
+      "prompt": "Draw a diagram of a typical ML training pipeline: a nightly job pulls labeled data from a data warehouse, a feature engineering step writes to a feature store, the trainer reads features and labels, runs distributed training on a GPU cluster, writes checkpoints to object storage, an eval job loads the checkpoint and runs a holdout suite, on pass the model gets registered in the model registry, and the serving infra picks up the new version.",
+      "expected_to_include": [
+        "Recognition that this is a batch pipeline, not a request trace",
+        "Plan section that names the cadence (nightly) explicitly",
+        "Linear flow with a clear gate at the eval step",
+        "Storage components (warehouse, feature store, object storage, registry) drawn as cylinders or sinks"
+      ],
+      "expected_to_exclude": [
+        "Forcing a 'user' or 'request' entry point that doesn't exist in this pipeline",
+        "Trust-boundary subgraphs (not the right axis)",
+        "Real-time / synchronous serving path mixed in (different cadence)",
+        "Inventory of every dataset, model artifact, or job-runner detail"
+      ]
+    }
+  ]
+}
