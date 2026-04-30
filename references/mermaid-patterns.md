@@ -206,6 +206,15 @@ A -->|cost > 0.8| B             ← breaks on >
 A -->|"cost > 0.8"| B           ← quote the label
 ```
 
+The bracket characters `[]`, `()`, `{}` are especially treacherous in unquoted edge labels because the parser sees them as the start of a node-shape declaration. `A -.->|products[]| B` will fail with a "got 'SQS'" parse error on `[`, even though to a human it's obviously a label. Always quote labels containing brackets, parens, or braces:
+
+```
+A -.->|products[]| B            ← parser thinks `[` opens a new node label, errors
+A -.->|"products[]"| B          ← quote the label, fixes it
+```
+
+This bites GitHub-rendered diagrams especially hard because the live editor's error message points at the right line but the GitHub renderer just shows "Unable to render rich display."
+
 **7. Reserved-ish keywords as node IDs.** `end`, `class`, `style`, `subgraph`, `direction` — don't use these as node IDs. They'll either error or silently get interpreted as a directive. Pick `end_node`, `cls`, etc.
 
 **8. Quality checklist before pasting.** Quick scan before you ship the source:
@@ -213,7 +222,7 @@ A -->|"cost > 0.8"| B           ← quote the label
 - No `[N. ...]` patterns inside node labels (markdown-list trap)
 - All subgraphs declared as `subgraph id ["Display Name"]`
 - All edges reference subgraphs / nodes by ID, not display name
-- Labels with spaces, parens, quotes, `@`, or `>` are wrapped in `"..."`
+- Labels with spaces, parens `()`, square brackets `[]`, braces `{}`, quotes, `@`, or `>` are wrapped in `"..."`
 - `linkStyle` indices recounted if you added or removed any edge
 
 Mermaid's error messages are usually accurate but can be terse — when in doubt, paste into Mermaid Live with the elk renderer enabled; the live editor's error highlighter pins the offending line.

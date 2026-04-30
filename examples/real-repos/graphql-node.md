@@ -50,7 +50,7 @@ flowchart LR
   gql --> resolver
   resolver -->|"normalize(preAuthEntitlements)"| norm
   resolver -->|"getJson(upsellUrl)"| tpm
-  norm -.->|products[]| resolver
+  norm -.->|"products[]"| resolver
   tpm -.->|upsell options JSON| resolver
   resolver --> field
   field --> shape
