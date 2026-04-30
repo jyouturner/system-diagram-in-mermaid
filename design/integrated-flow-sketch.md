@@ -76,13 +76,13 @@ Per skill invocation:
 
 | Path                      | Calls | Notes                                                              |
 | ------------------------- | ----- | ------------------------------------------------------------------ |
-| Today (no panel)          | 1     | Generator only.                                                    |
-| Phase C, panel-clean      | 3     | Generator + 2 parallel panel critiques (no revision needed).       |
-| Phase C, revision-worthy  | 4     | Generator + 2 parallel panel critiques + one revision.             |
+| Today (no panel)          | 1     | Generator only.                                                                |
+| Phase C, panel-clean      | 4     | Generator + 2 parallel panel critiques + 1 syntax linter.                      |
+| Phase C, revision-worthy  | 5     | Generator + 2 parallel panel critiques + 1 syntax linter + one revision.       |
 
-So 3–4× tokens vs today, every invocation. The two panel critiques run in parallel (see "Two-runs-unioned" under Post-ship adjustments below) — they catch stochastic flag drops at the cost of doubling the panel-step token spend.
+So 3–5× tokens vs today, every invocation. The two panel critiques and the syntax linter all run in parallel (see "Two-runs-unioned" and "Syntax-lint subagent" under Post-ship adjustments below). The linter is the cheapest of the four added calls — small JSON output, narrow scan; the dominant cost is the two panel critiques.
 
-Latency adds the panel critique (small — JSON output, two subagents in parallel so no sequential cost) plus optional revision. Estimated: +10–30 seconds per skill invocation depending on diagram size.
+Latency adds the panel critique and the linter (both small JSON outputs; all three run in parallel so no sequential cost) plus optional revision. Estimated: +10–30 seconds per skill invocation depending on diagram size.
 
 ## What this commits us to
 
@@ -136,6 +136,18 @@ Step 6 now spawns two panel-critique subagents in parallel rather than one, and 
 **Trade-off accepted.** Doubling token spend for stochasticity coverage is a real cost. The argument for default-on rather than opt-in: panel-clean is rare in practice (stage-1 saw only Trace Reader returning ship cleanly across all six runs; the other panelists found something almost every time), so the marginal cost of a second run is paid mostly when it actually adds coverage rather than just confirming a clean result.
 
 **Smaller question this introduces.** When the user provides `unknown` as the archetype hint and the two parallel runs classify it differently, which classification wins? Current handling: prefer whichever picked an SME persona that surfaced domain-specific issues; otherwise first-run. Not yet validated against real divergent-classification cases.
+
+### Syntax-lint subagent (adopted 2026-04-29)
+
+Step 6 now spawns a third subagent in parallel with the two panel critiques: a syntax linter that reads `references/syntax-lint-prompt.md` and scans the Mermaid source for parser-blocking footguns (unquoted special chars in edge labels, `@` in non-basic node shapes, subgraph display names without quotes, reserved keywords as IDs, the markdown-list trap, linkStyle index out-of-range).
+
+**Motivation.** Recurring failure mode in AI-generated Mermaid: a single unquoted `[]` or `@` causes GitHub's renderer to fail with "Unable to render rich display" while Mermaid Live surfaces a parse error pointing at the offending line. The phase-C panel critique focuses on semantic and structural issues; it doesn't run the source through a parser. The `examples/real-repos/graphql-node.md` diagram shipped with `norm -.->|products[]| resolver` and broke on GitHub — the patterns reference (`references/mermaid-patterns.md` § Syntax footguns) had a relevant section, but as a passive reference it didn't enforce. A procedural linter does.
+
+**Mechanism.** The linter returns `auto_fixes` as `(find, replace)` pairs the skill applies verbatim before partitioning panel issues. `manual_fixes` (e.g., reserved-keyword node IDs that would require renaming all references) are surfaced to the user. Verified end-to-end against the `products[]` case: linter correctly flagged the only parser-blocking issue and produced no false positives on stylistic-but-parseable patterns elsewhere in the same source.
+
+**Cost.** Adds one small subagent call per invocation. Total cost moves from 3–4× → 3–5× the no-panel baseline; the linter is the cheapest of the four added calls (small JSON, narrow scan).
+
+**What this does NOT replace.** The patterns reference still has authority for diagram-authoring guidance during generation — the linter is the post-hoc safety net, not the primary teacher.
 
 ## Suggested next step
 

@@ -105,9 +105,17 @@ The diagnostic mode is also useful when reviewing someone else's diagram without
 
 Before returning to the user, run a one-round panel critique on the diagram. This catches the subtler failure modes the procedure can let through — out-of-scope sprawl, trust-axis violations, buried architectural choices, plan-violation drift.
 
-Spawn **two** subagents in parallel. Each reads `references/panel-prompt.md` and applies the four-panelist critique procedure to your diagram independently, in its own context. Independent context matters — do not run the panel in your own context, since you'll grade work you just authored.
+Spawn **three** subagents in parallel:
 
-When both subagents return, **union their flagged issues**: collapse pairs that share both anchor and quoted span (one survives), keep all distinct issues. The unioned set is what feeds the partitioning step below. Two parallel runs catch stochastic flag drops — stage-1 evidence showed real issues catchable by one run can be missed by another with the same prompt against the same diagram. Wall-time cost is roughly one run (parallel); token cost roughly doubles for the panel step.
+- **Two panel-critique subagents.** Each reads `references/panel-prompt.md` and applies the four-panelist critique procedure to your diagram independently, in its own context.
+- **One syntax-lint subagent.** Reads `references/syntax-lint-prompt.md` and scans the Mermaid source for parser-blocking footguns (unquoted brackets / parens / braces / `@` / `>` in edge labels, reserved keywords as IDs, the markdown-list trap, linkStyle out-of-range). Returns `auto_fixes` as `(find, replace)` pairs plus any `manual_fixes` that need rename-style restructuring.
+
+Independent context matters for the panel runs — do not run the panel in your own context, since you'll grade work you just authored.
+
+When all three subagents return:
+
+1. **Apply linter auto-fixes first.** For each `auto_fixes` entry, replace the `find` text with `replace` verbatim in the Mermaid source. Surface any `manual_fixes` items in the panel summary (these need user attention — typically renames the linter can't safely apply alone).
+2. **Union the panel issues across the two panel runs**: collapse pairs that share both anchor and quoted span (one survives), keep all distinct issues. The unioned set is what feeds the partitioning step below. Two parallel runs catch stochastic flag drops — stage-1 evidence showed real issues catchable by one run can be missed by another with the same prompt against the same diagram. Wall-time cost is roughly one run (all three are parallel); token cost is roughly 2× one run for the panel step plus a small linter call.
 
 Partition the panel's flagged issues into two buckets:
 
@@ -160,3 +168,4 @@ Even with this procedure, watch for these tendencies:
 - `references/diagnostic-checklist.md` — failure modes for diagnosing an existing diagram before redrawing. Read this before iterating on user-provided diagrams.
 - `references/mermaid-patterns.md` — specific Mermaid idioms: subgraph styling, classDef patterns, linkStyle indexing, elk config, and a standalone HTML render template. Read this when writing the Mermaid source if you're unsure about a specific construct.
 - `references/panel-prompt.md` — the four-panelist critique procedure used by step 6. The skill spawns a subagent that loads this file and applies the panel to the diagram before returning to the user.
+- `references/syntax-lint-prompt.md` — the parser-footgun checklist used by step 6's syntax linter. Spawned alongside the panel critiques to catch unquoted brackets, `@`, reserved keywords, and other Mermaid v11 parse errors before they reach GitHub.
